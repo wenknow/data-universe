@@ -32,8 +32,6 @@ class RedditCustomScraper(Scraper):
     Scrapes Reddit data using a personal reddit account.
     """
 
-    USER_AGENT = f"User-Agent: python: {os.getenv('REDDIT_USERNAME')}"
-
     async def validate(self, entities: List[DataEntity]) -> List[ValidationResult]:
         """Validate the correctness of a DataEntity by URI."""
         if not entities:
@@ -73,14 +71,16 @@ class RedditCustomScraper(Scraper):
 
             # Retrieve the Reddit Post/Comment from PRAW.
             content = None
-
+            envInx = random.randint(1, 4)
+            envIndex = "_" + str(envInx)
+            userAgent = f"User-Agent: python: {os.getenv('REDDIT_USERNAME_'+envIndex)}"
             try:
                 async with asyncpraw.Reddit(
-                    client_id=os.getenv("REDDIT_CLIENT_ID"),
-                    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-                    username=os.getenv("REDDIT_USERNAME"),
-                    password=os.getenv("REDDIT_PASSWORD"),
-                    user_agent=RedditCustomScraper.USER_AGENT,
+                    client_id=os.getenv("REDDIT_CLIENT_ID_"+envIndex),
+                    client_secret=os.getenv("REDDIT_CLIENT_SECRET_"+envIndex),
+                    username=os.getenv("REDDIT_USERNAME_"+envIndex),
+                    password=os.getenv("REDDIT_PASSWORD_"+envIndex),
+                    user_agent=userAgent,
                 ) as reddit:
                     if reddit_content_to_verify.data_type == RedditDataType.POST:
                         submission = await reddit.submission(
@@ -156,18 +156,22 @@ class RedditCustomScraper(Scraper):
         search_sort = get_custom_sort_input(scrape_config.date_range.end)
         search_time = get_time_input(scrape_config.date_range.end)
 
+        envInx = random.randint(1, 4)
+        envIndex = "_" + str(envInx)
+        userAgent = f"User-Agent: python: {os.getenv('REDDIT_USERNAME_'+envIndex)}"
+
         # In either case we parse the response into a list of RedditContents.
         contents = None
         try:
             async with asyncpraw.Reddit(
-                client_id=os.getenv("REDDIT_CLIENT_ID"),
-                client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-                username=os.getenv("REDDIT_USERNAME"),
-                password=os.getenv("REDDIT_PASSWORD"),
-                user_agent=RedditCustomScraper.USER_AGENT,
+                client_id=os.getenv("REDDIT_CLIENT_ID"+envIndex),
+                client_secret=os.getenv("REDDIT_CLIENT_SECRET"+envIndex),
+                username=os.getenv("REDDIT_USERNAME"+envIndex),
+                password=os.getenv("REDDIT_PASSWORD"+envIndex),
+                user_agent=userAgent,
             ) as reddit:
                 subreddit = await reddit.subreddit(subreddit_name)
-
+                bt.logging.info("-------------client_id----------: " + os.getenv("REDDIT_CLIENT_ID"+envIndex))
                 if fetch_submissions:
                     submissions = None
                     match search_sort:

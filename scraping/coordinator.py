@@ -13,7 +13,7 @@ from common.data import DataLabel, DataSource, StrictBaseModel, TimeBucket
 from scraping.provider import ScraperProvider
 from scraping.scraper import ScrapeConfig, ScraperId
 from storage.miner.miner_storage import MinerStorage
-
+from common.date_range import DateRange
 
 class LabelScrapingConfig(StrictBaseModel):
     """Describes what labels to scrape."""
@@ -80,26 +80,32 @@ def _choose_scrape_configs(
         if label_config.label_choices:
             labels_to_scrape = [random.choice(label_config.label_choices)]
 
-        # Now, choose a time bucket to scrape.
-        current_bucket = TimeBucket.from_datetime(now)
-        oldest_bucket = TimeBucket.from_datetime(
-            now - dt.timedelta(minutes=label_config.max_age_hint_minutes)
+        # # Now, choose a time bucket to scrape.
+        # current_bucket = TimeBucket.from_datetime(now)
+        # oldest_bucket = TimeBucket.from_datetime(
+        #     now - dt.timedelta(minutes=label_config.max_age_hint_minutes)
+        # )
+
+        # chosen_bucket = current_bucket
+        # # If we have more than 1 bucket to choose from, choose a bucket in the range [oldest_bucket, current_bucket]
+        # if oldest_bucket.id < current_bucket.id:
+        #     # Use a triangular distribution to choose a bucket in this range. We choose a triangular distribution because
+        #     # this roughly aligns with the linear depreciation scoring that the validators use for data freshness.
+        #     chosen_id = numpy.random.default_rng().triangular(
+        #         left=oldest_bucket.id, mode=current_bucket.id, right=current_bucket.id
+        #     )
+        #     chosen_bucket = TimeBucket(id=chosen_id)
+    
+        nowTime = dt.datetime.now(tz=dt.timezone.utc)
+        date_range = DateRange(
+            start = nowTime - dt.timedelta(minutes=label_config.max_age_hint_minutes),
+            end = nowTime,
         )
-
-        chosen_bucket = current_bucket
-        # If we have more than 1 bucket to choose from, choose a bucket in the range [oldest_bucket, current_bucket]
-        if oldest_bucket.id < current_bucket.id:
-            # Use a triangular distribution to choose a bucket in this range. We choose a triangular distribution because
-            # this roughly aligns with the linear depreciation scoring that the validators use for data freshness.
-            chosen_id = numpy.random.default_rng().triangular(
-                left=oldest_bucket.id, mode=current_bucket.id, right=current_bucket.id
-            )
-            chosen_bucket = TimeBucket(id=chosen_id)
-
         results.append(
             ScrapeConfig(
                 entity_limit=label_config.max_data_entities,
-                date_range=TimeBucket.to_date_range(chosen_bucket),
+                # date_range=TimeBucket.to_date_range(chosen_bucket),
+                date_range = date_range,
                 labels=labels_to_scrape,
             )
         )
@@ -150,7 +156,7 @@ class ScraperCoordinator:
         self.config = config
 
         self.tracker = ScraperCoordinator.Tracker(self.config, dt.datetime.utcnow())
-        self.max_workers = 5
+        self.max_workers = 32
         self.is_running = False
         self.queue = asyncio.Queue()
 
