@@ -56,8 +56,8 @@ class TweetScraper(Scraper):
 
                 run_input = {
                     **TweetScraper.BASE_RUN_INPUT,
-                    "urls": [entity.uri],
-                    "maxTweets": tweet_count,
+                    "startUrls": [entity.uri],
+                    "maxItems": tweet_count,
                 }
                 run_config = RunConfig(
                     actor_id=TweetScraper.ACTOR_ID,
