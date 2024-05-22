@@ -1,8 +1,10 @@
 import asyncio
 import functools
 import random
+import sqlite3
 import threading
 import traceback
+from copy import copy
 import bittensor as bt
 import datetime as dt
 from typing import Dict, List, Optional
@@ -107,6 +109,88 @@ def _choose_scrape_configs(
     return results
 
 
+def deal_scrape_configs(scraper_id: ScraperId, config: CoordinatorConfig, now: dt.datetime, max_workers: int = 10
+                        ) -> List[ScrapeConfig]:
+    """For the given scraper, returns a list of scrapes (defined by ScrapeConfig) to be run."""
+    assert (
+            scraper_id in config.scraper_configs
+    ), f"Scraper Id {scraper_id} not in config"
+
+    scraper_config = config.scraper_configs[scraper_id]
+    results = []
+    tmp_labels_config = copy(scraper_config.labels_to_scrape)
+    labels_config = scraper_config.labels_to_scrape
+
+    if scraper_id == 'Reddit.custom':
+        with sqlite3.connect('SqliteMinerStorage.sqlite') as connection:
+            cursor = connection.cursor()
+            # 查询rate最大的30条记录 同一个主体30分钟只抓一次
+            now = dt.datetime.utcnow()
+            ninety_ago = now - dt.timedelta(minutes=30)
+            cursor.execute(f"SELECT label,size,minutes FROM ScrapyConfig where source = 1 and uptime < '{ninety_ago}' ORDER BY rate DESC, uptime ASC LIMIT {max_workers}")
+            rows = cursor.fetchall()
+
+            labels = []
+            # 取数据库中的配置
+            for row in rows:
+                data_label = DataLabel(value=row[0])
+                labels_config.append(
+                    LabelScrapingConfig(
+                        label_choices=[data_label],
+                        max_data_entities=row[1],
+                        max_age_hint_minutes=row[2],
+                    )
+                )
+                labels.append(row[0])
+
+            # 查完之后更新掉rate 防止重复
+            # 构建SQL查询语句，使用IN操作符匹配多个id
+            placeholders = ', '.join(['?'] * len(labels))  # 生成(? (?, ?, ...)形式的占位符
+            sql_query = f"""
+                UPDATE ScrapyConfig 
+                SET rate = CASE
+                    WHEN rate - 1 >= 0 THEN rate - 1
+                    ELSE 0
+                END 
+                WHERE label IN ({placeholders})
+                """
+            # 执行更新操作
+            cursor.execute(sql_query, labels)
+            connection.commit()
+
+    for label_config in labels_config:
+        # First, choose a label
+        labels_to_scrape = None
+        if label_config.label_choices:
+            labels_to_scrape = [random.choice(label_config.label_choices)]
+
+        # Now, choose a time bucket to scrape.
+        current_bucket = TimeBucket.from_datetime(now)
+        oldest_bucket = TimeBucket.from_datetime(
+            now - dt.timedelta(minutes=label_config.max_age_hint_minutes)
+        )
+
+        chosen_bucket = current_bucket
+        # If we have more than 1 bucket to choose from, choose a bucket in the range [oldest_bucket, current_bucket]
+        if oldest_bucket.id < current_bucket.id:
+            # Use a triangular distribution to choose a bucket in this range. We choose a triangular distribution because
+            # this roughly aligns with the linear depreciation scoring that the validators use for data freshness.
+            chosen_id = numpy.random.default_rng().triangular(
+                left=oldest_bucket.id, mode=current_bucket.id, right=current_bucket.id
+            )
+            chosen_bucket = TimeBucket(id=chosen_id)
+
+        results.append(
+            ScrapeConfig(
+                entity_limit=label_config.max_data_entities,
+                date_range=TimeBucket.to_date_range(chosen_bucket),
+                labels=labels_to_scrape,
+            )
+        )
+    scraper_config.labels_to_scrape = tmp_labels_config
+    return results
+
+
 class ScraperCoordinator:
     """Coordinates all the scrapers necessary based on the specified target ScrapingDistribution."""
 
@@ -144,13 +228,14 @@ class ScraperCoordinator:
         scraper_provider: ScraperProvider,
         miner_storage: MinerStorage,
         config: CoordinatorConfig,
+        max_workers: int = 5
     ):
         self.provider = scraper_provider
         self.storage = miner_storage
         self.config = config
 
         self.tracker = ScraperCoordinator.Tracker(self.config, dt.datetime.utcnow())
-        self.max_workers = 5
+        self.max_workers = max_workers
         self.is_running = False
         self.queue = asyncio.Queue()
 
@@ -191,14 +276,16 @@ class ScraperCoordinator:
             if not scraper_ids_to_scrape_now:
                 bt.logging.trace("Nothing ready to scrape yet. Trying again in 15s.")
                 # Nothing is due a scrape. Wait a few seconds and try again
-                await asyncio.sleep(15)
+                await asyncio.sleep(8)
                 continue
 
             for scraper_id in scraper_ids_to_scrape_now:
                 scraper = self.provider.get(scraper_id)
 
-                scrape_configs = _choose_scrape_configs(scraper_id, self.config, now)
-
+                scrape_configs = deal_scrape_configs(scraper_id, self.config, now, self.max_workers)
+                # 获取队列中的消息数量
+                queue_size = self.queue.qsize()
+                bt.logging.info(f"now queue_size: {queue_size}")
                 for config in scrape_configs:
                     # Use .partial here to make sure the functions arguments are copied/stored
                     # now rather than being lazily evaluated (if a lambda was used).

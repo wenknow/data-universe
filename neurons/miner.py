@@ -134,6 +134,7 @@ class Miner:
             scraper_provider=ScraperProvider(),
             miner_storage=self.storage,
             config=scraping_config,
+            max_workers=self.config.axon.max_workers
         )
 
         # Configure per hotkey per request limits.

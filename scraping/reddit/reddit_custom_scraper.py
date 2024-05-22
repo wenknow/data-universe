@@ -16,6 +16,7 @@ from scraping.reddit.utils import (
     normalize_permalink,
 )
 from scraping.reddit.model import RedditContent, RedditDataType
+import asyncprawcore.exceptions
 import traceback
 import datetime as dt
 import asyncio
@@ -31,8 +32,6 @@ class RedditCustomScraper(Scraper):
     """
     Scrapes Reddit data using a personal reddit account.
     """
-
-    USER_AGENT = f"User-Agent: python: {os.getenv('REDDIT_USERNAME')}"
 
     async def validate(self, entities: List[DataEntity]) -> List[ValidationResult]:
         """Validate the correctness of a DataEntity by URI."""
@@ -73,14 +72,16 @@ class RedditCustomScraper(Scraper):
 
             # Retrieve the Reddit Post/Comment from PRAW.
             content = None
-
+            env_inx = random.randint(1, int(os.getenv('REDDIT_CLIENT_COUNT')))
+            env_index = "_" + str(env_inx)
+            user_agent = f"User-Agent: python: {os.getenv('REDDIT_USERNAME_' + env_index)}"
             try:
                 async with asyncpraw.Reddit(
-                    client_id=os.getenv("REDDIT_CLIENT_ID"),
-                    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-                    username=os.getenv("REDDIT_USERNAME"),
-                    password=os.getenv("REDDIT_PASSWORD"),
-                    user_agent=RedditCustomScraper.USER_AGENT,
+                    client_id=os.getenv("REDDIT_CLIENT_ID_" + env_index),
+                    client_secret=os.getenv("REDDIT_CLIENT_SECRET_" + env_index),
+                    username=os.getenv("REDDIT_USERNAME_" + env_index),
+                    password=os.getenv("REDDIT_PASSWORD_" + env_index),
+                    user_agent=user_agent,
                 ) as reddit:
                     if reddit_content_to_verify.data_type == RedditDataType.POST:
                         submission = await reddit.submission(
@@ -131,9 +132,9 @@ class RedditCustomScraper(Scraper):
 
     async def scrape(self, scrape_config: ScrapeConfig) -> List[DataEntity]:
         """Scrapes a batch of reddit posts/comments according to the scrape config."""
-        bt.logging.trace(
-            f"Reddit custom scraper peforming scrape with config: {scrape_config}."
-        )
+        # bt.logging.trace(
+        #     f"Reddit custom scraper peforming scrape with config: {scrape_config}."
+        # )
 
         assert (
             not scrape_config.labels or len(scrape_config.labels) <= 1
@@ -156,15 +157,19 @@ class RedditCustomScraper(Scraper):
         search_sort = get_custom_sort_input(scrape_config.date_range.end)
         search_time = get_time_input(scrape_config.date_range.end)
 
+        env_inx = random.randint(1, int(os.getenv('REDDIT_CLIENT_COUNT')))
+        env_index = "_" + str(env_inx)
+        user_agent = f"User-Agent: android:com.wpm.myapp:v1.0.1 (by /u/{os.getenv('REDDIT_USERNAME_'+env_index)})"
+
         # In either case we parse the response into a list of RedditContents.
         contents = None
         try:
             async with asyncpraw.Reddit(
-                client_id=os.getenv("REDDIT_CLIENT_ID"),
-                client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-                username=os.getenv("REDDIT_USERNAME"),
-                password=os.getenv("REDDIT_PASSWORD"),
-                user_agent=RedditCustomScraper.USER_AGENT,
+                client_id=os.getenv("REDDIT_CLIENT_ID" + env_index),
+                client_secret=os.getenv("REDDIT_CLIENT_SECRET" + env_index),
+                username=os.getenv("REDDIT_USERNAME" + env_index),
+                password=os.getenv("REDDIT_PASSWORD" + env_index),
+                user_agent=user_agent,
             ) as reddit:
                 subreddit = await reddit.subreddit(subreddit_name)
 
@@ -191,13 +196,17 @@ class RedditCustomScraper(Scraper):
                         self._best_effort_parse_comment(comment)
                         async for comment in comments
                     ]
+        except asyncprawcore.exceptions.RequestException as e:
+            bt.logging.error(
+                f"Failed to scrape reddit using subreddit {subreddit_name}, limit {search_limit}, time {search_time}, sort {search_sort} env: {env_index} err: {str(e)}"
+            )
+            return []
         except Exception:
             bt.logging.error(
                 f"Failed to scrape reddit using subreddit {subreddit_name}, limit {search_limit}, time {search_time}, sort {search_sort}: {traceback.format_exc()}."
             )
             # TODO: Raise a specific exception, in case the scheduler wants to have some logic for retries.
             return []
-
         # Return the parsed results, ignoring data that can't be parsed.
         parsed_contents = [content for content in contents if content != None]
 

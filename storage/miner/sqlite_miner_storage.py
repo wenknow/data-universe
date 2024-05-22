@@ -126,7 +126,9 @@ class SqliteMinerStorage(MinerStorage):
 
     def store_data_entities(self, data_entities: List[DataEntity]):
         """Stores any number of DataEntities, making space if necessary."""
-
+        if len(data_entities) == 0:
+            bt.logging.error(f"store scrape for ZERO")
+            return
         added_content_size = 0
         for data_entity in data_entities:
             added_content_size += data_entity.content_size_bytes
@@ -145,7 +147,7 @@ class SqliteMinerStorage(MinerStorage):
             with self.clearing_space_lock:
                 # If we would exceed our maximum configured stored content size then clear space.
                 cursor = connection.cursor()
-                cursor.execute("SELECT SUM(contentSizeBytes) FROM DataEntity")
+                cursor.execute("SELECT SUM(bytes) FROM ScrapyConfig")
 
                 # If there are no rows we convert the None result to 0
                 result = cursor.fetchone()
@@ -165,6 +167,9 @@ class SqliteMinerStorage(MinerStorage):
 
             # Parse every DataEntity into an list of value lists for inserting.
             values = []
+            uris = []
+            now = dt.datetime.utcnow()
+            my_label = ""
 
             for data_entity in data_entities:
                 label = (
@@ -182,9 +187,37 @@ class SqliteMinerStorage(MinerStorage):
                         data_entity.content_size_bytes,
                     ]
                 )
+                uris.append(data_entity.uri)
+                my_label = label
+            # 获取重复的uri
+            uri_placeholders = ','.join(['?'] * len(uris))  # 生成如 ?,?,? 的字符串用于占位符
+            query = f"SELECT COUNT(1), SUM(contentSizeBytes) FROM DataEntity WHERE uri IN ({uri_placeholders})"
+            cursor.execute(query, uris)
+            old_res = cursor.fetchone()
+            old_rows = old_res[0]
+            old_bytes = old_res[1] if old_res[1] is not None else 0
+            # 总大小减去已存在的大小 得到新增的大小
+            new_bytes = added_content_size - old_bytes
+            all_rows = len(values)
+            insert_rate = round((all_rows - old_rows) / 300 * 5)
+            # 指定的label 强制insert_rate为最大
+            label_required = ["r/bitcoin", "r/bitcoincash", "r/btc", "r/cryptocurrency", "r/ethtrader",
+                              "r/wallstreetbets", "r/bittensor_", "r/cryptomarkets", "r/filecoin",
+                              "r/monero", "r/polkadot", "r/solana", "r/ethereumclassic"]
+            if my_label in label_required:
+                insert_rate = 100
+
+            # 根据抓取的有效数量 自动计算下一次抓取的数量
+            new_size = min(max((all_rows - old_rows) * 2, 50), 500)
 
             # Insert overwriting duplicate keys (in case of updated content).
             cursor.executemany("REPLACE INTO DataEntity VALUES (?,?,?,?,?,?,?)", values)
+
+            cursor.execute(f"UPDATE ScrapyConfig SET count = ?, rate = ?, size = ?, uptime = ? ,bytes = bytes + ? "
+                           f"WHERE label = ?", (all_rows, insert_rate, new_size, now, new_bytes, my_label))
+
+            bt.logging.success(f"Completed scrape label {my_label} insert {all_rows - old_rows} items. "
+                               f"by {all_rows} items. insert_rate {insert_rate * 20} %. new_bytes {new_bytes}")
 
             # Commit the insert.
             connection.commit()

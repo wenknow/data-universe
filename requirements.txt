@@ -10,3 +10,9 @@ pytz==2023.3.post1
 rich==13.7.0
 torch==2.1.2
 wandb==0.16.2
+attrs~=23.2.0
+sympy~=1.12
+asyncio~=3.4.3
+loguru~=0.7.0
+asyncprawcore~=2.4.0
+setuptools~=68.2.0
