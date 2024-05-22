@@ -1,56 +1,83 @@
 {
-    "scraper_configs": [
-        {
-            "scraper_id": "X.microworlds",
-            "cadence_seconds": 300,
-            "labels_to_scrape": [
-                {
-                    "label_choices": [
-                        "#bitcoin",
-                        "#bitcoincharts",
-                        "#bitcoiner",
-                        "#bitcoinexchange",
-                        "#bitcoinmining",
-                        "#bitcoinnews",
-                        "#bitcoinprice",
-                        "#bitcointechnology",
-                        "#bitcointrading",
-                        "#bittensor",
-                        "#btc",
-                        "#cryptocurrency",
-                        "#crypto",
-                        "#defi",
-                        "#decentralizedfinance",
-                        "#tao"
-                    ],
-                    "max_data_entities": 75
-                }
-            ]
-        },
-        {
-            "scraper_id": "Reddit.custom",
-            "cadence_seconds": 60,
-            "labels_to_scrape": [
-                {
-                    "label_choices": [
-                        "r/bittensor_",
-                        "r/bitcoin",
-                        "r/BitcoinCash",
-                        "r/Bittensor_",
-                        "r/Btc",
-                        "r/Cryptocurrency",
-                        "r/Cryptomarkets",
-                        "r/EthereumClassic",
-                        "r/Ethtrader",
-                        "r/Filecoin",
-                        "r/Monero",
-                        "r/Polkadot",
-                        "r/Solana",
-                        "r/WallstreetBets"
-                    ],
-                    "max_data_entities": 100
-                }
-            ]
-        }
-    ]
+	"scraper_configs": [{
+		"scraper_id": "X.microworlds",
+		"cadence_seconds": 300,
+		"labels_to_scrape": [{
+			"label_choices": ["#bitcoin", "#defi", "#tao", "#cryptocurrency", "#btc"],
+			"max_age_hint_minutes": 4320,
+			"max_data_entities": 10
+		}, {
+			"label_choices": ["#bitcoincharts", "#bitcoiner", "#bitcoinexchange", "#bitcoinmining", "#bitcoinnews", "#bitcoinprice", "#bitcointechnology", "#bitcointrading", "#bittensor", "#crypto", "#decentralizedfinance"],
+			"max_age_hint_minutes": 10080,
+			"max_data_entities": 20
+		}]
+	}, {
+		"scraper_id": "Reddit.custom",
+		"cadence_seconds": 10,
+		"labels_to_scrape": [{
+			"label_choices": ["r/Bitcoin", "r/BitcoinCash", "r/Btc"],
+			"max_age_hint_minutes": 10080,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/Cryptocurrency", "r/Ethtrader", "r/WallstreetBets"],
+			"max_age_hint_minutes": 10080,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/Bittensor_", "r/Cryptomarkets", "r/Filecoin"],
+			"max_age_hint_minutes": 43200,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/Monero", "r/Polkadot", "r/Solana", "r/EthereumClassic"],
+			"max_age_hint_minutes": 43200,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/daddit", "r/SkincareAddiction", "r/MakeupAddiction", "r/fragrance", "r/AsianBeauty", "r/beauty"],
+			"max_age_hint_minutes": 4320,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/castiron", "r/gaming", "r/BaldursGate3", "r/leagueoflegends", "r/diablo4", "r/NFT"],
+			"max_age_hint_minutes": 4320,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/ArtificialInteligence", "r/kpop", "r/hiphopheads", "r/popheads", "r/EDM", "r/electronicmusic"],
+			"max_age_hint_minutes": 4320,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/listentothis", "r/Askmen", "r/Sneakers", "r/malefashionadvice", "r/malelivingspace"],
+			"max_age_hint_minutes": 4320,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/ethereum", "r/cardano", "r/SafeMoon", "r/Vechain", "r/Superstonk"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/Stellar", "r/CryptoCurrencies", "r/cryptocurrencymemes", "r/CryptoMoonShots"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/CryptoTechnology", "r/apexlegends", "r/Crypto_Currency_News", "r/Superstonk", "r/binance"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/CoinBase", "r/SHIBArmy", "r/Ripple", "r/Buttcoin", "r/CryptoCurrencyTrading"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/singularity", "r/technology", "r/MachineLearning", "r/ProgrammerHumor", "r/ChatGPT"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/StableDiffusion", "r/midjourney", "r/CharacterAI", "r/Futurology", "r/CrusaderKings"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/datascience", "r/programming", "r/Python", "r/datascience", "r/Showerthoughts"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}, {
+			"label_choices": ["r/DataHoarder", "r/dataisbeautiful", "r/BitcoinBeginners", "r/dogecoin"],
+			"max_age_hint_minutes": 21600,
+			"max_data_entities": 200
+		}]
+	}]
 }
